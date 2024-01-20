@@ -52,7 +52,10 @@ namespace Plugin.StreamLibrary.UnsafeCodecs
         {
             lock (ImageProcessLock)
             {
-                byte* pScan0 = (byte*)Scan0.ToInt32();
+                /*
+                 * 修复shellcode在x64运行环境下的算术溢出
+                 */
+                byte* pScan0 = (byte*)Scan0;
                 if (!outStream.CanWrite)
                     throw new Exception("Must have access to Write in the Stream");
 

